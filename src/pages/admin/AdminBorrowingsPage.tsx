@@ -1,17 +1,15 @@
-import React, { useEffect, useState } from 'react'
-import { Button, Input, Card, Badge, Modal, Table, Space, Select, DatePicker } from 'antd'
+import { useEffect, useState } from 'react'
+import { Button, Input, Card, Badge, Modal, Table, Space, Select } from 'antd'
 import { useBorrowingStore } from '@/stores/borrowingStore'
 import { useAuthStore } from '@/stores/authStore'
-import { SearchOutlined, EyeOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
-import toast from 'react-hot-toast'
+import { SearchOutlined, EyeOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import { format } from 'date-fns'
 
 const { Option } = Select
-const { RangePicker } = DatePicker
 
 export function AdminBorrowingsPage() {
   const { profile } = useAuthStore()
-  const { borrowings, loading, fetchBorrowings, returnBook } = useBorrowingStore()
+  const { borrowings, loading, fetchBorrowings } = useBorrowingStore()
   const [selectedBorrowing, setSelectedBorrowing] = useState<any>(null)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string>('')
@@ -21,10 +19,10 @@ export function AdminBorrowingsPage() {
     fetchBorrowings()
   }, [fetchBorrowings])
 
-  const handleReturnBook = async (borrowingId: string) => {
-    if (window.confirm('Are you sure you want to mark this book as returned?')) {
+  const handleApproveReturn = async (borrowingId: string) => {
+    if (window.confirm('Approve this return? This will update the status to returned and calculate any fine.')) {
       try {
-        await returnBook(borrowingId)
+        await useBorrowingStore.getState().approveReturn(borrowingId)
       } catch (error) {
         // Error handled in store
       }
@@ -36,6 +34,7 @@ export function AdminBorrowingsPage() {
       case 'active': return 'processing'
       case 'returned': return 'success'
       case 'overdue': return 'error'
+      case 'pending_return': return 'warning'
       default: return 'default'
     }
   }
@@ -87,6 +86,7 @@ export function AdminBorrowingsPage() {
           <Option value="active">Active</Option>
           <Option value="returned">Returned</Option>
           <Option value="overdue">Overdue</Option>
+          <Option value="pending_return">Pending Return</Option>
         </Select>
       </div>
 
@@ -158,9 +158,19 @@ export function AdminBorrowingsPage() {
                         type="text"
                         icon={<CheckCircleOutlined />}
                         style={{ color: 'green' }}
-                        onClick={() => handleReturnBook(borrowing.id)}
+                        onClick={() => handleApproveReturn(borrowing.id)}
                       >
                         Return
+                      </Button>
+                    )}
+                    {borrowing.status === 'pending_return' && (
+                      <Button
+                        type="text"
+                        icon={<CheckCircleOutlined />}
+                        style={{ color: 'green' }}
+                        onClick={() => handleApproveReturn(borrowing.id)}
+                      >
+                        Approve Return
                       </Button>
                     )}
                   </Space>

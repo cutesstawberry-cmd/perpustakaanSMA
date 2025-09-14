@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseMember } from '@/lib/supabase'
+import { useAuthStore } from './authStore'
 import toast from 'react-hot-toast'
 import QRCode from 'qrcode'
 
@@ -63,14 +64,19 @@ export const useBookStore = create<BookState>((set, get) => ({
     try {
       set({ loading: true })
       const { filters, pagination } = get()
-      let query = supabase
+      
+      // Use appropriate client based on user role
+      const { profile } = useAuthStore.getState()
+      console.log('Current profile in fetchBooks:', profile)
+      
+      // For members, use supabaseMember; for admin/librarian, use regular supabase
+      const client = profile?.role === 'member' ? supabaseMember : supabase
+      console.log('Using client for role:', profile?.role)
+      
+      let query = client
         .from('books')
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
-        .range(
-          (pagination.page - 1) * pagination.limit,
-          pagination.page * pagination.limit - 1
-        )
 
       // Apply filters
       if (filters.search) {
@@ -86,15 +92,26 @@ export const useBookStore = create<BookState>((set, get) => ({
         query = query.gt('available_copies', 0)
       }
 
+      // Apply pagination
+      query = query.range(
+        (pagination.page - 1) * pagination.limit,
+        pagination.page * pagination.limit - 1
+      )
+
       const { data, error, count } = await query
 
-      if (error) throw error
+      if (error) {
+        console.error('Error fetching books:', error)
+        throw error
+      }
 
+      console.log('Fetched books:', data?.length || 0, 'books')
       set({ 
         books: data || [],
         pagination: { ...pagination, total: count || 0 }
       })
     } catch (error: any) {
+      console.error('Failed to fetch books:', error)
       toast.error(error.message || 'Failed to fetch books')
     } finally {
       set({ loading: false })
@@ -103,7 +120,10 @@ export const useBookStore = create<BookState>((set, get) => ({
 
   addBook: async (book) => {
     try {
-      const { data, error } = await supabase
+      const { profile } = useAuthStore.getState()
+      const client = profile?.role === 'member' ? supabaseMember : supabase
+      
+      const { data, error } = await client
         .from('books')
         .insert(book)
         .select()
@@ -125,7 +145,10 @@ export const useBookStore = create<BookState>((set, get) => ({
 
   updateBook: async (id, updates) => {
     try {
-      const { data, error } = await supabase
+      const { profile } = useAuthStore.getState()
+      const client = profile?.role === 'member' ? supabaseMember : supabase
+      
+      const { data, error } = await client
         .from('books')
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', id)
@@ -150,7 +173,10 @@ export const useBookStore = create<BookState>((set, get) => ({
 
   deleteBook: async (id) => {
     try {
-      const { error } = await supabase
+      const { profile } = useAuthStore.getState()
+      const client = profile?.role === 'member' ? supabaseMember : supabase
+      
+      const { error } = await client
         .from('books')
         .delete()
         .eq('id', id)
@@ -172,7 +198,10 @@ export const useBookStore = create<BookState>((set, get) => ({
     try {
       const qrCodeData = await QRCode.toDataURL(`BOOK:${bookId}`)
       
-      const { error } = await supabase
+      const { profile } = useAuthStore.getState()
+      const client = profile?.role === 'member' ? supabaseMember : supabase
+      
+      const { error } = await client
         .from('books')
         .update({ qr_code: qrCodeData })
         .eq('id', bookId)

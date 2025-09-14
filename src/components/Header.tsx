@@ -1,5 +1,6 @@
 import React from 'react'
 import { Button, Avatar, Dropdown, MenuProps } from 'antd'
+import { useNavigate } from 'react-router-dom'
 import { useTheme } from '@/components/ui/theme-provider'
 import { useAuthStore } from '@/stores/authStore'
 import { Moon, Sun, LogOut, User, Settings, Menu } from 'lucide-react'
@@ -11,9 +12,11 @@ interface HeaderProps {
 export function Header({ onMenuClick }: HeaderProps) {
   const { theme, setTheme } = useTheme()
   const { profile, signOut } = useAuthStore()
+  const navigate = useNavigate()
 
   const handleSignOut = async () => {
     await signOut()
+    navigate('/login')
   }
 
   const getInitials = (name: string | null | undefined) => {

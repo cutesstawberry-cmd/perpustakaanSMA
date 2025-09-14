@@ -1,18 +1,20 @@
-import React, { useEffect, useState } from 'react'
-import { Card, Button, Input, Tag, Avatar, Space } from 'antd'
+import { useEffect, useState } from 'react'
+import { Card, Button, Input, Tag, Avatar } from 'antd'
 import { useBorrowingStore } from '@/stores/borrowingStore'
 import { useAuthStore } from '@/stores/authStore'
-import { Search, Clock, CheckCircle, AlertTriangle, Calendar, User } from 'lucide-react'
+import { Search, Clock, CheckCircle, AlertTriangle, Calendar } from 'lucide-react'
 import { format, isAfter } from 'date-fns'
 
 export function BorrowingsPage() {
   const { profile } = useAuthStore()
-  const { borrowings, loading, fetchBorrowings, returnBook, updateOverdueBorrowings } = useBorrowingStore()
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'overdue' | 'returned'>('all')
+  const { borrowings, loading, fetchBorrowings, updateOverdueBorrowings } = useBorrowingStore()
 
   const isMember = profile?.role === 'member'
   const userId = isMember ? profile?.id : undefined
+  const overdueBorrowings = borrowings.filter(b => b.status === 'overdue' || (b.status === 'active' && isAfter(new Date(), new Date(b.due_date))))
+  const hasOverdue = overdueBorrowings.length > 0 && isMember
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'overdue' | 'returned' | 'pending_return'>('all')
 
   useEffect(() => {
     fetchBorrowings(userId)
@@ -41,6 +43,10 @@ export function BorrowingsPage() {
       return <Tag color="green" icon={<CheckCircle className="w-3 h-3 mr-1" />}>Returned</Tag>
     }
 
+    if (status === 'pending_return') {
+      return <Tag color="gold" icon={<Clock className="w-3 h-3 mr-1" />}>Pending Return</Tag>
+    }
+
     if (status === 'overdue' || (status === 'active' && isAfter(new Date(), new Date(dueDate)))) {
       return <Tag color="red" icon={<AlertTriangle className="w-3 h-3 mr-1" />}>Overdue</Tag>
     }
@@ -48,10 +54,20 @@ export function BorrowingsPage() {
     return <Tag color="blue" icon={<Clock className="w-3 h-3 mr-1" />}>Active</Tag>
   }
 
-  const handleReturn = async (borrowingId: string) => {
-    if (window.confirm('Are you sure you want to return this book?')) {
+  const handleMemberReturn = async (borrowingId: string) => {
+    if (window.confirm('Request to return this book? Admin approval is required.')) {
       try {
-        await returnBook(borrowingId)
+        await useBorrowingStore.getState().requestReturn(borrowingId)
+      } catch (error) {
+        // Error handled in store
+      }
+    }
+  }
+
+  const handleAdminReturn = async (borrowingId: string) => {
+    if (window.confirm('Return this book? This will complete the borrowing process.')) {
+      try {
+        await useBorrowingStore.getState().returnBook(borrowingId)
       } catch (error) {
         // Error handled in store
       }
@@ -79,6 +95,37 @@ export function BorrowingsPage() {
         </p>
       </div>
 
+      {hasOverdue && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex items-center">
+            <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mr-3" />
+            <div>
+              <h3 className="font-semibold text-red-800 dark:text-red-200">Overdue Books Alert!</h3>
+              <p className="text-red-700 dark:text-red-300 text-sm">
+                You have {overdueBorrowings.length} overdue book(s). Please return them as soon as possible to avoid fines.
+              </p>
+              {overdueBorrowings.length === 1 ? (
+                <Button
+                  type="link"
+                  onClick={() => setFilterStatus('overdue')}
+                  className="mt-1 p-0 text-red-600 dark:text-red-400"
+                >
+                  View Overdue Book
+                </Button>
+              ) : (
+                <Button
+                  type="link"
+                  onClick={() => setFilterStatus('overdue')}
+                  className="mt-1 p-0 text-red-600 dark:text-red-400"
+                >
+                  View Overdue Books
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-4">
         <div className="relative flex-1">
           <Input
@@ -90,14 +137,14 @@ export function BorrowingsPage() {
         </div>
 
         <div className="flex gap-2">
-          {(['all', 'active', 'overdue', 'returned'] as const).map((status) => (
+          {(['all', 'active', 'overdue', 'returned', 'pending_return'] as const).map((status) => (
             <Button
               key={status}
               type={filterStatus === status ? 'primary' : 'default'}
               size="small"
               onClick={() => setFilterStatus(status)}
             >
-              {status.charAt(0).toUpperCase() + status.slice(1)}
+              {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
             </Button>
           ))}
         </div>
@@ -150,7 +197,7 @@ export function BorrowingsPage() {
                     {!isMember && (
                       <div className="flex items-center mt-2 space-x-2">
                         <Avatar size="small" src={borrowing.profiles?.avatar_url}>
-                          {getInitials(borrowing.profiles?.full_name)}
+                          {getInitials(borrowing.profiles?.full_name ?? 'Unknown')}
                         </Avatar>
                         <span className="text-sm">
                           {borrowing.profiles?.full_name || 'Unknown User'}
@@ -167,10 +214,21 @@ export function BorrowingsPage() {
 
                 <div className="flex items-center space-x-3">
                   {getStatusBadge(borrowing.status, borrowing.due_date)}
+                  {borrowing.status === 'active' && isMember && (
+                    <Button
+                      size="small"
+                      onClick={() => handleMemberReturn(borrowing.id)}
+                    >
+                      Request Return
+                    </Button>
+                  )}
+                  {borrowing.status === 'pending_return' && isMember && (
+                    <Tag color="gold">Return Requested</Tag>
+                  )}
                   {borrowing.status === 'active' && !isMember && (
                     <Button
                       size="small"
-                      onClick={() => handleReturn(borrowing.id)}
+                      onClick={() => handleAdminReturn(borrowing.id)}
                     >
                       Return Book
                     </Button>

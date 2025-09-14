@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseAdmin } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 
 interface Profile {
@@ -21,6 +21,7 @@ interface UserState {
   updateUserRole: (userId: string, role: Profile['role']) => Promise<void>
   updateUser: (userId: string, updates: Partial<Profile>) => Promise<void>
   deleteUser: (userId: string) => Promise<void>
+  createUser: (memberId: string, password: string, userData: Partial<Profile>) => Promise<void>
 }
 
 export const useUserStore = create<UserState>((set, get) => ({
@@ -95,16 +96,12 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   deleteUser: async (userId) => {
     try {
-      // First delete from profiles
-      const { error: profileError } = await supabase
+      const { error } = await supabase
         .from('profiles')
         .delete()
         .eq('id', userId)
 
-      if (profileError) throw profileError
-
-      // Note: Deleting from auth.users requires admin privileges and is not directly supported
-      // The user would need to be deleted through Supabase Auth admin API
+      if (error) throw error
 
       set(state => ({
         users: state.users.filter(user => user.id !== userId)
@@ -113,6 +110,50 @@ export const useUserStore = create<UserState>((set, get) => ({
       toast.success('User deleted successfully!')
     } catch (error: any) {
       toast.error(error.message || 'Failed to delete user')
+      throw error
+    }
+  },
+
+  createUser: async (memberId, password, userData) => {
+    try {
+      console.log('Creating user with member ID:', memberId)
+      console.log('User data:', userData)
+      
+      // Generate a unique UUID for the user
+      const userId = crypto.randomUUID()
+      
+      // Create profile directly in profiles table
+      // Users created by admin are members by default (unless specified otherwise)
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          full_name: userData.full_name || memberId,
+          role: userData.role || 'member', // Default to member for admin-created users
+          member_id: memberId,
+          phone: userData.phone,
+          address: userData.address,
+          // Store password in a simple way (in production, use proper hashing)
+          password: password, // This will be stored as plain text for demo
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single()
+
+      if (profileError) {
+        console.error('Profile creation failed:', profileError)
+        throw new Error('Failed to create user profile: ' + profileError.message)
+      }
+
+      console.log('Profile created successfully:', profileData)
+
+      // Refresh users list
+      await get().fetchUsers()
+      toast.success('User created successfully!')
+    } catch (error: any) {
+      console.error('User creation failed:', error)
+      toast.error(error.message || 'Failed to create user')
       throw error
     }
   }

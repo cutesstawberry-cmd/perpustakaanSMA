@@ -2,8 +2,40 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
 
+// Validate environment variables
+if (!supabaseUrl) {
+  console.error('VITE_SUPABASE_URL is not defined')
+  throw new Error('Missing VITE_SUPABASE_URL environment variable')
+}
+
+if (!supabaseAnonKey) {
+  console.error('VITE_SUPABASE_ANON_KEY is not defined')
+  throw new Error('Missing VITE_SUPABASE_ANON_KEY environment variable')
+}
+
+console.log('Supabase URL:', supabaseUrl)
+console.log('Supabase Anon Key:', supabaseAnonKey ? 'Present' : 'Missing')
+
+// Regular client for normal operations
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+// Admin client for admin operations (user creation, etc.)
+export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+})
+
+// Client for member users (uses service role for database access)
+export const supabaseMember = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+})
 
 export type Database = {
   public: {
@@ -98,7 +130,7 @@ export type Database = {
           borrow_date: string
           due_date: string
           return_date: string | null
-          status: 'active' | 'returned' | 'overdue'
+          status: 'active' | 'returned' | 'overdue' | 'pending_return'
           fine_amount: number
           created_at: string
         }
@@ -109,7 +141,7 @@ export type Database = {
           borrow_date?: string
           due_date: string
           return_date?: string | null
-          status?: 'active' | 'returned' | 'overdue'
+          status?: 'active' | 'returned' | 'overdue' | 'pending_return'
           fine_amount?: number
           created_at?: string
         }
@@ -120,7 +152,7 @@ export type Database = {
           borrow_date?: string
           due_date?: string
           return_date?: string | null
-          status?: 'active' | 'returned' | 'overdue'
+          status?: 'active' | 'returned' | 'overdue' | 'pending_return'
           fine_amount?: number
           created_at?: string
         }

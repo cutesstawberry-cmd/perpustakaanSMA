@@ -5,14 +5,9 @@ import { useAuthStore } from '@/stores/authStore'
 import { X } from 'lucide-react'
 import {
   BookOpen,
-  Users,
   BarChart3,
-  Settings,
   Library,
-  UserPlus,
   History,
-  Star,
-  Calendar,
   Book,
   FileText,
   UserCog
@@ -44,12 +39,6 @@ const navigation = [
     roles: ['admin', 'librarian']
   },
   {
-    name: 'Reservations',
-    href: '/reservations',
-    icon: Calendar,
-    roles: ['admin', 'librarian']
-  },
-  {
     name: 'Books Management',
     href: '/admin/books',
     icon: Book,
@@ -67,18 +56,6 @@ const navigation = [
     icon: UserCog,
     roles: ['admin']
   },
-  {
-    name: 'Reviews',
-    href: '/reviews',
-    icon: Star,
-    roles: ['admin', 'librarian']
-  },
-  {
-    name: 'Settings',
-    href: '/settings',
-    icon: Settings,
-    roles: ['admin', 'librarian', 'member']
-  }
 ]
 
 interface SidebarProps {
@@ -90,19 +67,9 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const location = useLocation()
   const { profile } = useAuthStore()
 
-  // Debug logging
-  console.log('Sidebar - Profile:', profile)
-  console.log('Sidebar - Profile Role:', profile?.role)
-
-  // Temporarily show all items for debugging
   const filteredNavigation = navigation.filter(item => {
-    const hasRole = profile?.role && item.roles.includes(profile.role)
-    console.log(`Filtering ${item.name}: role=${profile?.role}, hasRole=${hasRole}, itemRoles=${item.roles}`)
-    // For debugging, show all items if no profile or if role is admin
-    return !profile || profile.role === 'admin' || hasRole
+    return profile?.role && item.roles.includes(profile.role)
   })
-
-  console.log('Filtered navigation:', filteredNavigation)
 
   return (
     <>
@@ -124,15 +91,6 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         <span className="ml-2 text-xl font-semibold text-gray-900 dark:text-white">
           LibraryMS
         </span>
-      </div>
-
-      {/* Debug info */}
-      <div className="px-6 py-2 bg-yellow-100 dark:bg-yellow-900 border-b border-gray-200 dark:border-gray-700">
-        <div className="text-xs text-gray-600 dark:text-gray-300">
-          <div>Role: {profile?.role || 'No profile'}</div>
-          <div>User: {profile?.full_name || 'Not logged in'}</div>
-          <div>Debug: All items shown</div>
-        </div>
       </div>
       
       <nav className="mt-6 px-3">
