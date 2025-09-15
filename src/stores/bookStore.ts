@@ -40,6 +40,7 @@ interface BookState {
   addBook: (book: Omit<Book, 'id' | 'created_at' | 'updated_at' | 'qr_code'>) => Promise<void>
   updateBook: (id: string, updates: Partial<Book>) => Promise<void>
   deleteBook: (id: string) => Promise<void>
+  bulkDeleteBooks: (ids: string[]) => Promise<void>
   setFilters: (filters: Partial<BookFilters>) => void
   setPagination: (pagination: Partial<BookState['pagination']>) => void
   generateQRCode: (bookId: string) => Promise<void>
@@ -190,6 +191,29 @@ export const useBookStore = create<BookState>((set, get) => ({
       toast.success('Book deleted successfully!')
     } catch (error: any) {
       toast.error(error.message || 'Failed to delete book')
+      throw error
+    }
+  },
+
+  bulkDeleteBooks: async (ids) => {
+    try {
+      const { profile } = useAuthStore.getState()
+      const client = profile?.role === 'member' ? supabaseMember : supabase
+      
+      const { error } = await client
+        .from('books')
+        .delete()
+        .in('id', ids)
+
+      if (error) throw error
+
+      set(state => ({
+        books: state.books.filter(book => !ids.includes(book.id))
+      }))
+
+      toast.success(`${ids.length} books deleted successfully!`)
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete books')
       throw error
     }
   },

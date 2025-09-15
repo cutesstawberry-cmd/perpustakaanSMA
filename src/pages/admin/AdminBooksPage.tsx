@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Button, Input, Card, Badge, Modal, Table, Space } from 'antd'
+import { Button, Input, Card, Badge, Modal, Table, Space, Popconfirm } from 'antd'
 import { useBookStore } from '@/stores/bookStore'
 import { useAuthStore } from '@/stores/authStore'
 import { BookForm } from '@/components/books/BookForm'
@@ -8,11 +8,13 @@ import toast from 'react-hot-toast'
 
 export function AdminBooksPage() {
   const { profile } = useAuthStore()
-  const { books, loading, filters, fetchBooks, setFilters, deleteBook } = useBookStore()
+  const { books, loading, filters, fetchBooks, setFilters, deleteBook, bulkDeleteBooks } = useBookStore()
   const [selectedBook, setSelectedBook] = useState<any>(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [loadingBulk, setLoadingBulk] = useState(false)
 
   useEffect(() => {
     fetchBooks()
@@ -32,6 +34,30 @@ export function AdminBooksPage() {
     }
   }
 
+  const handleBulkDelete = async () => {
+    if (selectedRowKeys.length === 0) return
+    
+    try {
+      setLoadingBulk(true)
+      await bulkDeleteBooks(selectedRowKeys as string[])
+      setSelectedRowKeys([])
+    } catch (error) {
+      // Error handled in store
+    } finally {
+      setLoadingBulk(false)
+    }
+  }
+
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: (newSelectedRowKeys: React.Key[]) => {
+      setSelectedRowKeys(newSelectedRowKeys)
+    },
+    getCheckboxProps: (record: any) => ({
+      name: record.title,
+    }),
+  }
+
   if (!profile || !['admin', 'librarian'].includes(profile.role)) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -45,20 +71,45 @@ export function AdminBooksPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Manage Books
+            Kelola Buku
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Admin panel for book management
+            Panel admin untuk manajemen buku
           </p>
         </div>
 
-        <Button type="primary" onClick={() => setIsAddModalOpen(true)}>
-          <PlusOutlined />
-          Add Book
-        </Button>
+        <div className="flex items-center space-x-3">
+          {selectedRowKeys.length > 0 && (
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {selectedRowKeys.length} dipilih
+              </span>
+              <Popconfirm
+                title="Hapus Buku Terpilih"
+                description={`Apakah Anda yakin ingin menghapus ${selectedRowKeys.length} buku yang dipilih?`}
+                onConfirm={handleBulkDelete}
+                okText="Ya, Hapus"
+                cancelText="Batal"
+                okType="danger"
+              >
+                <Button 
+                  danger 
+                  loading={loadingBulk}
+                  icon={<DeleteOutlined />}
+                >
+                  Hapus Terpilih
+                </Button>
+              </Popconfirm>
+            </div>
+          )}
+          <Button type="primary" onClick={() => setIsAddModalOpen(true)}>
+            <PlusOutlined />
+            Tambah Buku
+          </Button>
+        </div>
 
         <Modal
-          title="Add New Book"
+          title="Tambah Buku Baru"
           open={isAddModalOpen}
           onCancel={() => setIsAddModalOpen(false)}
           footer={null}
@@ -73,17 +124,26 @@ export function AdminBooksPage() {
         </Modal>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 flex justify-between items-center">
         <Input
-          placeholder="Search books by title or author..."
+          placeholder="Cari buku berdasarkan judul atau penulis..."
           prefix={<SearchOutlined />}
           value={filters.search}
           onChange={handleSearch}
           style={{ width: 300 }}
         />
+        {selectedRowKeys.length > 0 && (
+          <Button 
+            type="link" 
+            onClick={() => setSelectedRowKeys([])}
+            className="text-gray-500"
+          >
+            Batalkan pilihan
+          </Button>
+        )}
       </div>
 
-      <Card title={`Books (${books.length})`}>
+      <Card title={`Buku (${books.length})`}>
         {loading ? (
           <div className="flex items-center justify-center h-32">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -92,41 +152,47 @@ export function AdminBooksPage() {
           <Table
             dataSource={books}
             rowKey="id"
+            rowSelection={rowSelection}
             columns={[
               {
-                title: 'Title',
+                title: 'Judul',
                 dataIndex: 'title',
                 key: 'title',
                 sorter: true,
+                ellipsis: true,
               },
               {
-                title: 'Author',
+                title: 'Penulis',
                 dataIndex: 'author',
                 key: 'author',
                 sorter: true,
+                ellipsis: true,
               },
               {
                 title: 'Genre',
                 dataIndex: 'genre',
                 key: 'genre',
                 render: (genre) => genre || '-',
+                ellipsis: true,
               },
               {
-                title: 'Copies',
+                title: 'Eksemplar',
                 key: 'copies',
                 render: (_, book) => `${book.available_copies}/${book.total_copies}`,
+                width: 100,
               },
               {
                 title: 'Status',
                 key: 'status',
                 render: (_, book) => (
                   <Badge status={book.available_copies > 0 ? 'success' : 'default'}>
-                    {book.available_copies > 0 ? 'Available' : 'Borrowed'}
+                    {book.available_copies > 0 ? 'Tersedia' : 'Dipinjam'}
                   </Badge>
                 ),
+                width: 100,
               },
               {
-                title: 'Actions',
+                title: 'Aksi',
                 key: 'actions',
                 render: (_, book) => (
                   <Space>
@@ -137,6 +203,7 @@ export function AdminBooksPage() {
                         setSelectedBook(book)
                         setIsDetailModalOpen(true)
                       }}
+                      title="Lihat Detail"
                     />
                     <Button
                       type="text"
@@ -145,15 +212,26 @@ export function AdminBooksPage() {
                         setSelectedBook(book)
                         setIsEditModalOpen(true)
                       }}
+                      title="Edit Buku"
                     />
-                    <Button
-                      type="text"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={() => handleDeleteBook(book.id)}
-                    />
+                    <Popconfirm
+                      title="Hapus Buku"
+                      description="Apakah Anda yakin ingin menghapus buku ini?"
+                      onConfirm={() => handleDeleteBook(book.id)}
+                      okText="Ya, Hapus"
+                      cancelText="Batal"
+                      okType="danger"
+                    >
+                      <Button
+                        type="text"
+                        danger
+                        icon={<DeleteOutlined />}
+                        title="Hapus Buku"
+                      />
+                    </Popconfirm>
                   </Space>
                 ),
+                width: 120,
               },
             ]}
           />
@@ -162,7 +240,7 @@ export function AdminBooksPage() {
 
       {/* Book Details Modal */}
       <Modal
-        title="Book Details"
+        title="Detail Buku"
         open={isDetailModalOpen}
         onCancel={() => setIsDetailModalOpen(false)}
         footer={null}
@@ -210,7 +288,7 @@ export function AdminBooksPage() {
 
       {/* Edit Book Modal */}
       <Modal
-        title="Edit Book"
+        title="Edit Buku"
         open={isEditModalOpen}
         onCancel={() => setIsEditModalOpen(false)}
         footer={null}

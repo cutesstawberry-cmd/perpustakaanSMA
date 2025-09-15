@@ -1,9 +1,20 @@
 import { useEffect, useState } from 'react'
-import { Card, Button, Input, Tag, Avatar } from 'antd'
+import { Card, Button, Input, Tag, Avatar, Space, Row, Col, Alert, Empty } from 'antd'
 import { useBorrowingStore } from '@/stores/borrowingStore'
 import { useAuthStore } from '@/stores/authStore'
-import { Search, Clock, CheckCircle, AlertTriangle, Calendar } from 'lucide-react'
+import { 
+  MagnifyingGlass,
+  Clock,
+  CheckCircle,
+  Warning,
+  Calendar,
+  Book,
+  CalendarX
+} from '@phosphor-icons/react'
 import { format, isAfter } from 'date-fns'
+import { id } from 'date-fns/locale'
+
+const { Search } = Input
 
 export function BorrowingsPage() {
   const { profile } = useAuthStore()
@@ -40,22 +51,49 @@ export function BorrowingsPage() {
 
   const getStatusBadge = (status: string, dueDate: string) => {
     if (status === 'returned') {
-      return <Tag color="green" icon={<CheckCircle className="w-3 h-3 mr-1" />}>Returned</Tag>
+      return (
+        <Tag color="success" icon={<CheckCircle size={14} weight="fill" />}>
+          Dikembalikan
+        </Tag>
+      )
     }
 
     if (status === 'pending_return') {
-      return <Tag color="gold" icon={<Clock className="w-3 h-3 mr-1" />}>Pending Return</Tag>
+      return (
+        <Tag color="warning" icon={<Clock size={14} weight="fill" />}>
+          Menunggu Pengembalian
+        </Tag>
+      )
     }
 
     if (status === 'overdue' || (status === 'active' && isAfter(new Date(), new Date(dueDate)))) {
-      return <Tag color="red" icon={<AlertTriangle className="w-3 h-3 mr-1" />}>Overdue</Tag>
+      return (
+        <Tag color="error" icon={<Warning size={14} weight="fill" />}>
+          Terlambat
+        </Tag>
+      )
     }
 
-    return <Tag color="blue" icon={<Clock className="w-3 h-3 mr-1" />}>Active</Tag>
+    return (
+      <Tag color="processing" icon={<Clock size={14} weight="fill" />}>
+        Aktif
+      </Tag>
+    )
+  }
+
+  const getStatusText = (status: string) => {
+    const statusMap = {
+      'all': 'Semua',
+      'active': 'Aktif',
+      'overdue': 'Terlambat',
+      'returned': 'Dikembalikan',
+      'pending_return': 'Menunggu Pengembalian'
+    }
+    return statusMap[status as keyof typeof statusMap] || status
   }
 
   const handleMemberReturn = async (borrowingId: string) => {
-    if (window.confirm('Request to return this book? Admin approval is required.')) {
+    if (window.confirm('Ajukan pengembalian buku ini? Persetujuan admin diperlukan.')) {
       try {
         await useBorrowingStore.getState().requestReturn(borrowingId)
       } catch (error) {
@@ -65,7 +103,7 @@ export function BorrowingsPage() {
   }
 
   const handleAdminReturn = async (borrowingId: string) => {
-    if (window.confirm('Return this book? This will complete the borrowing process.')) {
+    if (window.confirm('Kembalikan buku ini? Ini akan menyelesaikan proses peminjaman.')) {
       try {
         await useBorrowingStore.getState().returnBook(borrowingId)
       } catch (error) {
@@ -84,201 +122,310 @@ export function BorrowingsPage() {
       .slice(0, 2)
   }
 
+  const formatDate = (dateString: string) => {
+    return format(new Date(dateString), 'dd MMM yyyy', { locale: id })
+  }
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          {isMember ? 'My Borrowings' : 'All Borrowings'}
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          {isMember ? 'Track your borrowed books' : 'Manage all library borrowings'}
-        </p>
-      </div>
-
-      {hasOverdue && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <div className="flex items-center">
-            <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mr-3" />
+    <div className="min-h-screen bg-gray-50/30 dark:bg-gray-900">
+      <div className="px-4 sm:px-6 lg:px-8 py-6">
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="font-semibold text-red-800 dark:text-red-200">Overdue Books Alert!</h3>
-              <p className="text-red-700 dark:text-red-300 text-sm">
-                You have {overdueBorrowings.length} overdue book(s). Please return them as soon as possible to avoid fines.
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                {isMember ? 'Peminjaman Saya' : 'Semua Peminjaman'}
+              </h1>
+              <p className="text-gray-600 text-lg">
+                {isMember ? 'Lacak buku-buku yang Anda pinjam' : 'Kelola semua peminjaman perpustakaan'}
               </p>
-              {overdueBorrowings.length === 1 ? (
-                <Button
-                  type="link"
-                  onClick={() => setFilterStatus('overdue')}
-                  className="mt-1 p-0 text-red-600 dark:text-red-400"
-                >
-                  View Overdue Book
-                </Button>
-              ) : (
-                <Button
-                  type="link"
-                  onClick={() => setFilterStatus('overdue')}
-                  className="mt-1 p-0 text-red-600 dark:text-red-400"
-                >
-                  View Overdue Books
-                </Button>
-              )}
+            </div>
+            <div className="mt-4 sm:mt-0">
+              <div className="flex items-center space-x-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                <Book size={20} className="text-blue-600" weight="duotone" />
+                <span className="text-sm font-medium text-blue-800">
+                  {filteredBorrowings.length} Peminjaman
+                </span>
+              </div>
             </div>
           </div>
         </div>
-      )}
 
-      <div className="flex gap-4">
-        <div className="relative flex-1">
-          <Input
-            placeholder={isMember ? "Search your books..." : "Search books or members..."}
-            prefix={<Search className="text-gray-400 h-4 w-4" />}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+        {/* Overdue Alert */}
+        {hasOverdue && (
+          <Alert
+            type="error"
+            showIcon
+            icon={<Warning size={20} weight="fill" />}
+            message="Peringatan Buku Terlambat!"
+            description={
+              <div>
+                <p className="mb-2">
+                  Anda memiliki {overdueBorrowings.length} buku yang terlambat dikembalikan. 
+                  Harap kembalikan sesegera mungkin untuk menghindari denda.
+                </p>
+                <Button
+                  type="link"
+                  size="small"
+                  onClick={() => setFilterStatus('overdue')}
+                  className="p-0 h-auto text-red-600 hover:text-red-700"
+                >
+                  {overdueBorrowings.length === 1 ? 'Lihat Buku Terlambat' : 'Lihat Buku-buku Terlambat'}
+                </Button>
+              </div>
+            }
+            className="mb-6"
           />
-        </div>
+        )}
 
-        <div className="flex gap-2">
-          {(['all', 'active', 'overdue', 'returned', 'pending_return'] as const).map((status) => (
-            <Button
-              key={status}
-              type={filterStatus === status ? 'primary' : 'default'}
-              size="small"
-              onClick={() => setFilterStatus(status)}
-            >
-              {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="space-y-4">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="animate-pulse">
-              <div className="bg-gray-200 dark:bg-gray-700 h-24 rounded-lg"></div>
-            </div>
-          ))}
-        </div>
-      ) : filteredBorrowings.length === 0 ? (
-        <Card>
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <Calendar className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-4 text-lg font-medium">No borrowings found</h3>
-              <p className="text-gray-500">
-                {isMember ? "You haven't borrowed any books yet." : "No borrowing records match your criteria."}
-              </p>
-            </div>
-          </div>
+        {/* Search and Filters */}
+        <Card className="mb-6 shadow-sm">
+          <Row gutter={[16, 16]} align="middle">
+            <Col xs={24} md={12} lg={16}>
+              <Search
+                placeholder={isMember ? "Cari buku Anda..." : "Cari buku atau anggota..."}
+                prefix={<MagnifyingGlass size={16} className="text-gray-400" />}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                size="large"
+                className="w-full"
+              />
+            </Col>
+            <Col xs={24} md={12} lg={8}>
+              <Space wrap className="w-full justify-end">
+                {(['all', 'active', 'overdue', 'returned', 'pending_return'] as const).map((status) => (
+                  <Button
+                    key={status}
+                    type={filterStatus === status ? 'primary' : 'default'}
+                    size="middle"
+                    onClick={() => setFilterStatus(status)}
+                    className={`${filterStatus === status ? 'shadow-md' : ''}`}
+                  >
+                    {getStatusText(status)}
+                  </Button>
+                ))}
+              </Space>
+            </Col>
+          </Row>
         </Card>
-      ) : (
-        <div className="space-y-4">
-          {filteredBorrowings.map((borrowing) => (
-            <Card key={borrowing.id}>
-              <div className="flex items-start justify-between">
-                <div className="flex items-start space-x-4">
-                  <div className="w-16 h-20 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center flex-shrink-0">
-                    {borrowing.books?.cover_url ? (
-                      <img
-                        src={borrowing.books.cover_url}
-                        alt={borrowing.books?.title || 'Book cover'}
-                        className="w-full h-full object-cover rounded-lg"
-                      />
-                    ) : (
-                      <Calendar className="h-8 w-8 text-gray-400" />
-                    )}
-                  </div>
 
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold">{borrowing.books?.title || 'Unknown Title'}</h3>
-                    <p className="text-sm text-gray-500">
-                      by {borrowing.books?.author || 'Unknown Author'}
-                    </p>
+        {/* Content */}
+        {loading ? (
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <Card key={i} loading className="shadow-sm">
+                <div className="h-32"></div>
+              </Card>
+            ))}
+          </div>
+        ) : filteredBorrowings.length === 0 ? (
+          <Card className="shadow-sm">
+            <Empty
+              image={<CalendarX size={64} className="text-gray-400 mx-auto" weight="duotone" />}
+              imageStyle={{ height: 80 }}
+              description={
+                <div className="text-center">
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Tidak ada peminjaman ditemukan
+                  </h3>
+                  <p className="text-gray-500">
+                    {isMember 
+                      ? "Anda belum meminjam buku apapun." 
+                      : "Tidak ada catatan peminjaman yang sesuai dengan kriteria Anda."
+                    }
+                  </p>
+                </div>
+              }
+              className="py-12"
+            />
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {filteredBorrowings.map((borrowing) => (
+              <Card 
+                key={borrowing.id} 
+                className="shadow-sm hover:shadow-md transition-shadow duration-200"
+                bodyStyle={{ padding: '24px' }}
+              >
+                <Row gutter={[24, 16]} align="middle">
+                  {/* Book Cover */}
+                  <Col xs={4} sm={3} md={2}>
+                    <div className="w-full aspect-[3/4] bg-gradient-to-b from-blue-50 to-blue-100 rounded-lg flex items-center justify-center shadow-sm border border-blue-200">
+                      {borrowing.books?.cover_url ? (
+                        <img
+                          src={borrowing.books.cover_url}
+                          alt={borrowing.books?.title || 'Sampul buku'}
+                          className="w-full h-full object-cover rounded-lg"
+                        />
+                      ) : (
+                        <Book size={24} className="text-blue-600" weight="duotone" />
+                      )}
+                    </div>
+                  </Col>
 
-                    {!isMember && (
-                      <div className="flex items-center mt-2 space-x-2">
-                        <Avatar size="small" src={borrowing.profiles?.avatar_url}>
-                          {getInitials(borrowing.profiles?.full_name ?? 'Unknown')}
-                        </Avatar>
-                        <span className="text-sm">
-                          {borrowing.profiles?.full_name || 'Unknown User'}
-                          {borrowing.profiles?.member_id && (
-                            <span className="text-gray-500 ml-1">
-                              (ID: {borrowing.profiles.member_id})
+                  {/* Book Info */}
+                  <Col xs={20} sm={21} md={14}>
+                    <div className="space-y-2">
+                      <h3 className="text-xl font-bold text-gray-900 line-clamp-1">
+                        {borrowing.books?.title || 'Judul Tidak Diketahui'}
+                      </h3>
+                      <p className="text-gray-600 font-medium">
+                        oleh {borrowing.books?.author || 'Penulis Tidak Diketahui'}
+                      </p>
+
+                      {!isMember && (
+                        <div className="flex items-center space-x-3 mt-3">
+                          <Avatar 
+                            size="small" 
+                            src={borrowing.profiles?.avatar_url}
+                            className="border-2 border-blue-200"
+                          >
+                            {getInitials(borrowing.profiles?.full_name ?? 'Tidak Diketahui')}
+                          </Avatar>
+                          <div className="flex flex-col">
+                            <span className="font-medium text-gray-900">
+                              {borrowing.profiles?.full_name || 'Pengguna Tidak Diketahui'}
                             </span>
-                          )}
-                        </span>
+                            {borrowing.profiles?.member_id && (
+                              <span className="text-sm text-gray-500">
+                                ID: {borrowing.profiles.member_id}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </Col>
+
+                  {/* Status and Actions */}
+                  <Col xs={24} md={8}>
+                    <div className="flex flex-col space-y-3 md:items-end">
+                      <div className="flex items-center space-x-3">
+                        {getStatusBadge(borrowing.status, borrowing.due_date)}
+                        
+                        {borrowing.status === 'active' && isMember && (
+                          <Button
+                            type="primary"
+                            ghost
+                            size="small"
+                            onClick={() => handleMemberReturn(borrowing.id)}
+                            icon={<Clock size={14} />}
+                          >
+                            Ajukan Pengembalian
+                          </Button>
+                        )}
+                        
+                        {borrowing.status === 'pending_return' && isMember && (
+                          <Tag color="gold" className="px-3 py-1">
+                            Menunggu Persetujuan
+                          </Tag>
+                        )}
+                        
+                        {borrowing.status === 'active' && !isMember && (
+                          <Button
+                            type="primary"
+                            size="small"
+                            onClick={() => handleAdminReturn(borrowing.id)}
+                            icon={<CheckCircle size={14} weight="fill" />}
+                          >
+                            Kembalikan Buku
+                          </Button>
+                        )}
                       </div>
+                    </div>
+                  </Col>
+                </Row>
+
+                {/* Borrowing Details */}
+                <div className="mt-6 pt-4 border-t border-gray-100">
+                  <Row gutter={[24, 12]} className="text-sm">
+                    <Col xs={12} md={6}>
+                      <div className="space-y-1">
+                        <span className="text-gray-500 block font-medium">Tanggal Pinjam:</span>
+                        <div className="flex items-center space-x-2">
+                          <Calendar size={14} className="text-blue-600" />
+                          <span className="font-semibold text-gray-900">
+                            {formatDate(borrowing.borrow_date)}
+                          </span>
+                        </div>
+                      </div>
+                    </Col>
+
+                    <Col xs={12} md={6}>
+                      <div className="space-y-1">
+                        <span className="text-gray-500 block font-medium">Batas Kembali:</span>
+                        <div className="flex items-center space-x-2">
+                          <CalendarX size={14} className={`${
+                            isAfter(new Date(), new Date(borrowing.due_date)) && borrowing.status !== 'returned'
+                              ? 'text-red-600'
+                              : 'text-orange-600'
+                          }`} />
+                          <span className={`font-semibold ${
+                            isAfter(new Date(), new Date(borrowing.due_date)) && borrowing.status !== 'returned'
+                              ? 'text-red-600'
+                              : 'text-gray-900'
+                          }`}>
+                            {formatDate(borrowing.due_date)}
+                          </span>
+                        </div>
+                      </div>
+                    </Col>
+
+                    {borrowing.return_date && (
+                      <Col xs={12} md={6}>
+                        <div className="space-y-1">
+                          <span className="text-gray-500 block font-medium">Dikembalikan:</span>
+                          <div className="flex items-center space-x-2">
+                            <CheckCircle size={14} className="text-green-600" weight="fill" />
+                            <span className="font-semibold text-green-600">
+                              {formatDate(borrowing.return_date)}
+                            </span>
+                          </div>
+                        </div>
+                      </Col>
                     )}
-                  </div>
-                </div>
 
-                <div className="flex items-center space-x-3">
-                  {getStatusBadge(borrowing.status, borrowing.due_date)}
-                  {borrowing.status === 'active' && isMember && (
-                    <Button
-                      size="small"
-                      onClick={() => handleMemberReturn(borrowing.id)}
-                    >
-                      Request Return
-                    </Button>
-                  )}
-                  {borrowing.status === 'pending_return' && isMember && (
-                    <Tag color="gold">Return Requested</Tag>
-                  )}
-                  {borrowing.status === 'active' && !isMember && (
-                    <Button
-                      size="small"
-                      onClick={() => handleAdminReturn(borrowing.id)}
-                    >
-                      Return Book
-                    </Button>
-                  )}
-                </div>
-              </div>
+                    {(borrowing.fine_amount && borrowing.fine_amount > 0) && (
+                      <Col xs={12} md={6}>
+                        <div className="space-y-1">
+                          <span className="text-gray-500 block font-medium">Denda:</span>
+                          <div className="flex items-center space-x-2">
+                            <Warning size={14} className="text-red-600" weight="fill" />
+                            <span className="font-semibold text-red-600">
+                              Rp {borrowing.fine_amount.toLocaleString('id-ID')}
+                            </span>
+                          </div>
+                        </div>
+                      </Col>
+                    )}
+                  </Row>
 
-              <div className="mt-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-500">Borrowed:</span>
-                    <p className="font-medium">
-                      {format(new Date(borrowing.borrow_date), 'MMM dd, yyyy')}
-                    </p>
-                  </div>
-
-                  <div>
-                    <span className="text-gray-500">Due Date:</span>
-                    <p className={`font-medium ${
-                      isAfter(new Date(), new Date(borrowing.due_date)) && borrowing.status !== 'returned'
-                        ? 'text-red-600'
-                        : ''
-                    }`}>
-                      {format(new Date(borrowing.due_date), 'MMM dd, yyyy')}
-                    </p>
-                  </div>
-
-                  {borrowing.return_date && (
-                    <div>
-                      <span className="text-gray-500">Returned:</span>
-                      <p className="font-medium text-green-600">
-                        {format(new Date(borrowing.return_date), 'MMM dd, yyyy')}
-                      </p>
-                    </div>
-                  )}
-
-                  {(borrowing.fine_amount && borrowing.fine_amount > 0) && (
-                    <div>
-                      <span className="text-gray-500">Fine:</span>
-                      <p className="font-medium text-red-600">
-                        ${borrowing.fine_amount.toFixed(2)}
-                      </p>
+                  {/* Days calculation */}
+                  {borrowing.status === 'active' && (
+                    <div className="mt-3 pt-3 border-t border-gray-50">
+                      {isAfter(new Date(), new Date(borrowing.due_date)) ? (
+                        <div className="flex items-center space-x-2 text-red-600">
+                          <Warning size={14} weight="fill" />
+                          <span className="text-sm font-medium">
+                            Terlambat {Math.ceil((new Date().getTime() - new Date(borrowing.due_date).getTime()) / (1000 * 60 * 60 * 24))} hari
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-2 text-blue-600">
+                          <Clock size={14} />
+                          <span className="text-sm font-medium">
+                            Sisa {Math.ceil((new Date(borrowing.due_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} hari
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
