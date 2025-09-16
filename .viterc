@@ -1,0 +1,18 @@
+# Vite configuration for better source map handling
+# This file helps resolve source map issues with dependencies
+
+# Disable source maps for problematic dependencies
+sourcemapIgnoreList: [
+  "node_modules/lucide-react",
+  "node_modules/@phosphor-icons/react"
+]
+
+# Force re-optimization of dependencies
+forceOptimize: true
+
+# Better chunk splitting for icons
+iconChunks: [
+  "lucide-react",
+  "@phosphor-icons/react", 
+  "@ant-design/icons"
+]
