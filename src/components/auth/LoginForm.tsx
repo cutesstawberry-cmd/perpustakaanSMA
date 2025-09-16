@@ -90,7 +90,7 @@ export function LoginForm() {
                   </span>
                   <br />
                   <span className="text-gray-800 dark:text-white">
-                    SMA Negeri
+                    SMA MUSLIMIN
                   </span>
                 </h1>
                 
