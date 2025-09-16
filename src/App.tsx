@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, Suspense, lazy } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ThemeProvider } from './components/ui/theme-provider'
@@ -7,12 +7,12 @@ import { Toaster } from 'react-hot-toast'
 import { Layout } from './components/Layout'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { LoginForm } from './components/auth/LoginForm'
-import { Dashboard } from './pages/Dashboard'
-import { BooksPage } from './pages/BooksPage'
-import { BorrowingsPage } from './pages/BorrowingsPage'
-import { AdminBooksPage } from './pages/admin/AdminBooksPage'
-import { AdminBorrowingsPage } from './pages/admin/AdminBorrowingsPage'
-import { AdminUsersPage } from './pages/admin/AdminUsersPage'
+const Dashboard = lazy(() => import('./pages/Dashboard').then(module => ({ default: module.Dashboard })))
+const BooksPage = lazy(() => import('./pages/BooksPage').then(module => ({ default: module.BooksPage })))
+const BorrowingsPage = lazy(() => import('./pages/BorrowingsPage').then(module => ({ default: module.BorrowingsPage })))
+const AdminBooksPage = lazy(() => import('./pages/admin/AdminBooksPage').then(module => ({ default: module.AdminBooksPage })))
+const AdminBorrowingsPage = lazy(() => import('./pages/admin/AdminBorrowingsPage').then(module => ({ default: module.AdminBorrowingsPage })))
+const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage').then(module => ({ default: module.AdminUsersPage })))
 import { useAuthStore } from './stores/authStore'
 
 const queryClient = new QueryClient({
@@ -39,6 +39,12 @@ function App() {
     )
   }
 
+  const LoadingFallback = () => (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    </div>
+  )
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="library-ui-theme">
@@ -55,7 +61,9 @@ function App() {
                     index
                     element={
                       <ProtectedRoute>
-                        <Dashboard />
+                        <Suspense fallback={<LoadingFallback />}>
+                          <Dashboard />
+                        </Suspense>
                       </ProtectedRoute>
                     }
                   />
@@ -63,7 +71,9 @@ function App() {
                     path="books"
                     element={
                       <ProtectedRoute>
-                        <BooksPage />
+                        <Suspense fallback={<LoadingFallback />}>
+                          <BooksPage />
+                        </Suspense>
                       </ProtectedRoute>
                     }
                   />
@@ -71,7 +81,9 @@ function App() {
                     path="borrowings"
                     element={
                       <ProtectedRoute allowedRoles={['admin', 'librarian']}>
-                        <BorrowingsPage />
+                        <Suspense fallback={<LoadingFallback />}>
+                          <BorrowingsPage />
+                        </Suspense>
                       </ProtectedRoute>
                     }
                   />
@@ -79,7 +91,9 @@ function App() {
                     path="my-borrowings"
                     element={
                       <ProtectedRoute allowedRoles={['member']}>
-                        <BorrowingsPage />
+                        <Suspense fallback={<LoadingFallback />}>
+                          <BorrowingsPage />
+                        </Suspense>
                       </ProtectedRoute>
                     }
                   />
@@ -87,7 +101,9 @@ function App() {
                     path="admin/books"
                     element={
                       <ProtectedRoute allowedRoles={['admin', 'librarian']}>
-                        <AdminBooksPage />
+                        <Suspense fallback={<LoadingFallback />}>
+                          <AdminBooksPage />
+                        </Suspense>
                       </ProtectedRoute>
                     }
                   />
@@ -95,7 +111,9 @@ function App() {
                     path="admin/borrowings"
                     element={
                       <ProtectedRoute allowedRoles={['admin', 'librarian']}>
-                        <AdminBorrowingsPage />
+                        <Suspense fallback={<LoadingFallback />}>
+                          <AdminBorrowingsPage />
+                        </Suspense>
                       </ProtectedRoute>
                     }
                   />
@@ -103,7 +121,9 @@ function App() {
                     path="admin/users"
                     element={
                       <ProtectedRoute allowedRoles={['admin']}>
-                        <AdminUsersPage />
+                        <Suspense fallback={<LoadingFallback />}>
+                          <AdminUsersPage />
+                        </Suspense>
                       </ProtectedRoute>
                     }
                   />
