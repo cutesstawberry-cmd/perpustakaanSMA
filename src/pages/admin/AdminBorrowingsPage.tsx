@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Button, Input, Card, Badge, Modal, Table, Space, Select } from 'antd'
 import { useBorrowingStore } from '@/stores/borrowingStore'
 import { useAuthStore } from '@/stores/authStore'
-import { SearchOutlined, EyeOutlined, CheckCircleOutlined } from '@ant-design/icons'
+import { BorrowingForm } from '@/components/borrowings/BorrowingForm'
+import { SearchOutlined, EyeOutlined, CheckCircleOutlined, PlusOutlined } from '@ant-design/icons'
 import { format } from 'date-fns'
 
 const { Option } = Select
@@ -12,6 +13,7 @@ export function AdminBorrowingsPage() {
   const { borrowings, loading, fetchBorrowings } = useBorrowingStore()
   const [selectedBorrowing, setSelectedBorrowing] = useState<any>(null)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
+  const [isCreateBorrowingModalOpen, setIsCreateBorrowingModalOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [userFilter, setUserFilter] = useState<string>('')
 
@@ -63,9 +65,17 @@ export function AdminBorrowingsPage() {
             Manage Borrowings
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Admin panel for borrowing management
+            Admin panel for borrowing management - Create borrowings for users without internet access
           </p>
         </div>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => setIsCreateBorrowingModalOpen(true)}
+          size="large"
+        >
+          Create Borrowing
+        </Button>
       </div>
 
       <div className="flex gap-4 mb-4">
@@ -225,6 +235,24 @@ export function AdminBorrowingsPage() {
             )}
           </div>
         )}
+      </Modal>
+
+      {/* Create Borrowing Modal */}
+      <Modal
+        title="Create New Borrowing"
+        open={isCreateBorrowingModalOpen}
+        onCancel={() => setIsCreateBorrowingModalOpen(false)}
+        footer={null}
+        width={800}
+        destroyOnClose
+      >
+        <BorrowingForm
+          onSuccess={() => {
+            setIsCreateBorrowingModalOpen(false)
+            fetchBorrowings()
+          }}
+          onCancel={() => setIsCreateBorrowingModalOpen(false)}
+        />
       </Modal>
     </div>
   )

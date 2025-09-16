@@ -31,6 +31,7 @@ interface BorrowingState {
   loading: boolean
   fetchBorrowings: (userId?: string) => Promise<void>
   borrowBook: (bookId: string, userId: string, daysToReturn: number) => Promise<void>
+  createBorrowingForUser: (bookId: string, userId: string, dueDate: string) => Promise<void>
   requestReturn: (borrowingId: string) => Promise<void>
   approveReturn: (borrowingId: string) => Promise<void>
   returnBook: (borrowingId: string) => Promise<void>
@@ -206,6 +207,103 @@ export const useBorrowingStore = create<BorrowingState>((set, get) => ({
     } catch (error: any) {
       console.error('Failed to borrow book:', error)
       toast.error(error.message || 'Failed to borrow book')
+      throw error
+    }
+  },
+
+  createBorrowingForUser: async (bookId, userId, dueDate) => {
+    try {
+      // This function is specifically for admin/librarian to create borrowings on behalf of users
+      const { profile } = useAuthStore.getState()
+      
+      if (!['admin', 'librarian'].includes(profile?.role || '')) {
+        throw new Error('Only admins and librarians can create borrowings for users')
+      }
+      
+      console.log('Admin creating borrowing for user:', { bookId, userId, dueDate, admin: profile?.role })
+      
+      // Check if book is available using the database function
+      const { data: isAvailable, error: availError } = await supabase
+        .rpc('is_book_available', { p_book_id: bookId })
+  
+      if (availError) {
+        console.error('Error checking book availability:', availError)
+        throw availError
+      }
+      
+      if (!isAvailable) {
+        throw new Error('Book is not available for borrowing')
+      }
+
+      // Verify user exists and is a member
+      const { data: user, error: userError } = await supabase
+        .from('profiles')
+        .select('id, full_name, member_id, role')
+        .eq('id', userId)
+        .single()
+
+      if (userError || !user) {
+        throw new Error('User not found')
+      }
+
+      if (user.role !== 'member') {
+        throw new Error('Can only create borrowings for member users')
+      }
+
+      const borrowDate = new Date().toISOString()
+
+      console.log('Creating borrowing record for user:', {
+        user_id: userId,
+        book_id: bookId,
+        borrow_date: borrowDate,
+        due_date: dueDate,
+        user_name: user.full_name,
+        member_id: user.member_id
+      })
+
+      // Create borrowing record
+      const { error: borrowingError } = await supabase
+        .from('borrowings')
+        .insert({
+          user_id: userId,
+          book_id: bookId,
+          borrow_date: borrowDate,
+          due_date: dueDate,
+          status: 'active'
+        })
+        .select()
+        .single()
+
+      if (borrowingError) {
+        console.error('Error creating borrowing:', borrowingError)
+        throw borrowingError
+      }
+      
+      // Decrement available copies
+      const { data: currentBook, error: fetchBookError } = await supabase
+        .from('books')
+        .select('available_copies')
+        .eq('id', bookId)
+        .single()
+      
+      if (fetchBookError) {
+        console.error('Could not fetch book for update:', fetchBookError)
+      } else if (currentBook && currentBook.available_copies > 0) {
+        const { error: updateError } = await supabase
+          .from('books')
+          .update({ available_copies: currentBook.available_copies - 1 })
+          .eq('id', bookId)
+        if (updateError) {
+          console.error('Failed to decrement available copies:', updateError)
+        }
+      }
+      
+      // Refresh borrowings list for admin view
+      await get().fetchBorrowings()
+      toast.success(`Book borrowed successfully for ${user.full_name || user.member_id}!`)
+    } catch (error: any) {
+      console.error('Failed to create borrowing for user:', error)
+      toast.error(error.message || 'Failed to create borrowing for user')
       throw error
     }
   },
